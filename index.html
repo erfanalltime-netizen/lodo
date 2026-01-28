@@ -1,0 +1,711 @@
+<!-- START OF FILE Update: January 28, 2026 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ludo Master Pro - Fixed</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #141e30; --bg-light: #243b55;
+            --red: #ff0000; --red-dark: #cc0000;
+            --green: #00ff00; --green-dark: #00cc00;
+            --yellow: #ffcc00; --yellow-dark: #cca300;
+            --blue: #0066ff; --blue-dark: #0047b3;
+            --white: #ffffff;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation; }
+
+        body {
+            margin: 0; padding: 0;
+            background: radial-gradient(circle, var(--bg-light), var(--bg-dark));
+            height: 100vh; width: 100vw;
+            overflow: hidden;
+            font-family: 'Nunito', sans-serif;
+            display: flex; flex-direction: column; color: white;
+        }
+
+        /* --- SCREENS --- */
+        .screen { display: none; position: absolute; width: 100%; height: 100%; top:0; left:0; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: linear-gradient(135deg, #1e3c72, #2a5298); }
+        .active-screen { display: flex !important; }
+
+        .title { font-size: 3rem; text-shadow: 0 5px 0 rgba(0,0,0,0.3); margin-bottom: 30px; }
+        
+        .btn {
+            background: linear-gradient(to right, #f1c40f, #f39c12);
+            border: 2px solid #fff; padding: 12px 30px; margin: 8px;
+            border-radius: 50px; font-size: 1.1rem; font-weight: 900; color: #333;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); cursor: pointer; width: 80%; max-width: 300px;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-blue { background: linear-gradient(to right, #3498db, #2980b9); color: white; }
+        .btn-green { background: linear-gradient(to right, #2ecc71, #27ae60); color: white; }
+        .btn-red { background: linear-gradient(to right, #e74c3c, #c0392b); color: white; }
+
+        .color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .c-btn { width: 80px; height: 80px; border-radius: 15px; border: 3px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
+        .c-btn:hover { transform: scale(1.1); }
+
+        input {
+            padding: 15px; border-radius: 30px; border: none; width: 80%; max-width: 300px;
+            font-size: 1.1rem; text-align: center; margin: 10px; font-weight: bold;
+        }
+
+        /* --- GAME UI --- */
+        #game-ui { display: none; width: 100%; height: 100%; position: relative; }
+        #game-layout {
+            position: relative; width: 100%; height: 100%;
+            display: flex; flex-direction: column; 
+            justify-content: flex-start; /* Move Map UP */
+            align-items: center; padding-top: 10px;
+        }
+
+        .player-bar { 
+            display: flex; justify-content: space-between; width: 94%; max-width: 450px; height: 90px; z-index: 50; 
+            margin: 5px 0; /* Add Gap so no overlap */
+        }
+        .player-bar.top { align-items: flex-end; }
+        .player-bar.bottom { align-items: flex-start; }
+
+        #board-container { 
+            flex-grow: 0; display: flex; justify-content: center; align-items: center; width: 100%; position: relative; overflow: visible; z-index: 10; 
+            margin: 15px 0; /* Clear Gap from dice */
+        }
+        #ludo-board-svg { width: 92vmin; height: 92vmin; max-width: 450px; max-height: 450px; background: #fff; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.7); border: 2px solid #000; }
+
+        /* --- DICE --- */
+        .player-hub { display: flex; flex-direction: column; align-items: center; position: relative; width: 75px; transition: opacity 0.3s; opacity: 0.5; filter: grayscale(0.8); }
+        .player-hub.active-turn { opacity: 1; filter: grayscale(0); z-index: 100; transform: scale(1.05); }
+        .scene { width: 55px; height: 55px; perspective: 800px; cursor: pointer; position: relative; margin: 5px 0; }
+        .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transform: translateZ(-27px); }
+        .cube.rolling { animation: roll-toss 0.4s linear infinite; }
+        
+        .cube__face { position: absolute; width: 55px; height: 55px; background: linear-gradient(145deg, #fff, #eee); border: 1px solid #aaa; border-radius: 8px; display: flex; justify-content: center; align-items: center; backface-visibility: hidden; }
+        .cube__face::after { content: ''; display: block; background-color: #333; border-radius: 50%; }
+        
+        /* Adjusted for size 55 */
+        .cube__face--1 { transform: rotateY(0deg) translateZ(27px); } .cube__face--1::after { width: 14px; height: 14px; background: #e74c3c; }
+        .cube__face--2 { transform: rotateY(90deg) translateZ(27px); } .cube__face--2::after { width: 12px; height: 12px; box-shadow: -14px -14px #333, 14px 14px #333; background: transparent; }
+        .cube__face--3 { transform: rotateY(180deg) translateZ(27px); } .cube__face--3::after { width: 12px; height: 12px; box-shadow: -14px -14px #333, 0 0 #333, 14px 14px #333; background: transparent; }
+        .cube__face--4 { transform: rotateY(-90deg) translateZ(27px); } .cube__face--4::after { width: 12px; height: 12px; box-shadow: -14px -14px #333, 14px -14px #333, -14px 14px #333, 14px 14px #333; background: transparent; }
+        .cube__face--5 { transform: rotateX(90deg) translateZ(27px); } .cube__face--5::after { width: 12px; height: 12px; box-shadow: -14px -14px #333, 14px -14px #333, 0 0 #333, -14px 14px #333, 14px 14px #333; background: transparent; }
+        .cube__face--6 { transform: rotateX(-90deg) translateZ(27px); } .cube__face--6::after { width: 12px; height: 12px; box-shadow: -14px -14px #333, 14px -14px #333, -14px 0 #333, 14px 0 #333, -14px 14px #333, 14px 14px #333; background: transparent; }
+
+        @keyframes roll-toss { 0% { transform: translateZ(-27px) rotateX(0deg) rotateY(0deg); } 100% { transform: translateZ(-27px) rotateX(360deg) rotateY(360deg); } }
+        .active-turn .scene { animation: pulse-ready 1.5s infinite; }
+        @keyframes pulse-ready { 0%{transform: scale(1);} 50%{transform: scale(1.1);} 100%{transform: scale(1);} }
+
+        /* Names & Tokens */
+        .p-info { background: rgba(0,0,0,0.8); color: #f1c40f; padding: 2px 8px; border-radius: 8px; font-size: 12px; font-weight: bold; margin-top: 3px; border: 1px solid rgba(255,255,255,0.3); white-space: nowrap; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+        .top .p-info { order: -1; margin-bottom: 5px; } /* Name above dice for top */
+        .bottom .p-info { order: 2; margin-top: 5px; } /* Name below dice for bottom */
+        
+        .token { r: 2.2%; stroke: rgba(0,0,0,0.6); stroke-width: 1px; transition: none; cursor: pointer; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.5)); }
+        .token-highlight { stroke: white; stroke-width: 3px; animation: pulse-ring 0.8s infinite; }
+        @keyframes pulse-ring { 0% { r: 2.2%; } 50% { r: 2.8%; } 100% { r: 2.2%; } }
+
+        /* --- CHAT & MIC --- */
+        .control-btn { position: absolute; width: 45px; height: 45px; border-radius: 50%; border: 2px solid white; display:flex; align-items:center; justify-content:center; font-size: 20px; cursor: pointer; z-index: 200; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; }
+        .control-btn:active { transform: scale(0.9); }
+        
+        #chat-btn { bottom: 80px; right: 20px; background: #333; display:none; }
+        #mic-btn { bottom: 135px; right: 20px; background: #c0392b; display:none; }
+        .mic-on { background: #2ecc71 !important; box-shadow: 0 0 15px #2ecc71 !important; }
+
+        #chat-ui { position: absolute; bottom: 90px; right: 75px; width: 260px; background: rgba(20, 30, 48, 0.95); border: 2px solid rgba(255,255,255,0.2); border-radius: 15px; padding: 10px; display: none; z-index: 200; backdrop-filter: blur(5px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #chat-msgs { height: 180px; overflow-y: auto; color: white; font-size: 13px; margin-bottom: 8px; scrollbar-width: thin; }
+        #chat-msgs div { margin-bottom: 4px; padding: 4px 8px; background: rgba(255,255,255,0.1); border-radius: 8px; }
+        #chat-msgs b { color: #f1c40f; }
+        
+        #chat-input { width: 100%; padding: 8px; background: rgba(0,0,0,0.3); color: white; border: 1px solid #555; margin: 0; font-size: 13px; }
+        #emoji-bar { display: flex; justify-content: space-between; font-size: 22px; cursor: pointer; margin-top: 8px; padding: 0 5px; }
+
+        #toast { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); color: #fff; border: 2px solid #fff; padding: 15px 30px; border-radius: 30px; font-size: 1.2rem; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 300; text-align: center; }
+        #room-code-display { position: absolute; top: 5px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; font-weight: bold; z-index: 200; display: none; border: 1px solid rgba(255,255,255,0.2); font-size: 12px; }
+        .loading { font-size: 1.2rem; animation: blink 1s infinite; margin: 10px 0; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        #lobby-list { list-style: none; padding: 0; margin: 20px 0; width: 100%; text-align: center; }
+        #lobby-list li { background: rgba(255,255,255,0.1); margin: 5px auto; padding: 8px; width: 80%; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. MAIN MENU -->
+    <div id="menu-screen" class="screen active-screen">
+        <h1 class="title">LUDO MASTER</h1>
+        <button class="btn" onclick="showScreen('play-mode-screen')">🎮 Play Game</button>
+        <button class="btn btn-blue" onclick="showScreen('profile-screen')">👤 Profile</button>
+        <button class="btn btn-red" onclick="showScreen('custom-online-screen')">⚔️ Custom Online</button>
+    </div>
+
+    <!-- 2. PLAY MODE -->
+    <div id="play-mode-screen" class="screen">
+        <h1 class="title">Select Mode</h1>
+        <button class="btn" onclick="prepOffline(2, 'vsAI')">🤖 VS Computer</button>
+        <button class="btn btn-blue" onclick="prepOffline(2, 'vsPlayer')">👥 2 Players</button>
+        <button class="btn btn-green" onclick="prepOffline(3, 'vsPlayer')">👨‍👩‍👦 3 Players</button>
+        <button class="btn btn-red" onclick="prepOffline(4, 'vsPlayer')">👨‍👩‍👧‍👦 4 Players</button>
+        <button class="btn" onclick="showScreen('menu-screen')" style="margin-top:20px; background:#333; color:white;">⬅ Back</button>
+    </div>
+
+    <!-- 3. PROFILE -->
+    <div id="profile-screen" class="screen">
+        <h1 class="title">Profile</h1>
+        <div style="width:100px; height:100px; background:#ddd; border-radius:50%; margin-bottom:20px; display:flex; align-items:center; justify-content:center; color:#333; font-size:40px;">👤</div>
+        <input type="text" id="p-name" placeholder="Enter Name" value="Guest">
+        <button class="btn" onclick="saveProfile()">Save</button>
+        <button class="btn" onclick="showScreen('menu-screen')" style="background:#333; color:white;">⬅ Back</button>
+    </div>
+
+    <!-- 4. COLOR SELECT -->
+    <div id="color-select-screen" class="screen">
+        <h2 class="title">Choose Color</h2>
+        <div class="color-grid">
+            <div class="c-btn" style="background:var(--red);" onclick="selectMyColor('red')">🔴</div>
+            <div class="c-btn" style="background:var(--green);" onclick="selectMyColor('green')">🟢</div>
+            <div class="c-btn" style="background:var(--yellow);" onclick="selectMyColor('yellow')">🟡</div>
+            <div class="c-btn" style="background:var(--blue);" onclick="selectMyColor('blue')">🔵</div>
+        </div>
+        <button class="btn" onclick="showScreen('menu-screen')" style="background:#333; color:white;">Cancel</button>
+    </div>
+
+    <!-- 5. ONLINE MENU -->
+    <div id="custom-online-screen" class="screen">
+        <h1 class="title">Custom Room</h1>
+        <button class="btn btn-blue" onclick="showScreen('host-setup-screen')">👑 Host Game</button>
+        <button class="btn btn-green" onclick="showScreen('join-screen')">🚀 Join Game</button>
+        <button class="btn" onclick="showScreen('menu-screen')" style="margin-top:20px; background:#333; color:white;">⬅ Back</button>
+    </div>
+
+    <!-- 6. HOST SETUP -->
+    <div id="host-setup-screen" class="screen">
+        <h2>Host Settings</h2>
+        <p>Total Players:</p>
+        <div style="display:flex; gap:10px; margin-bottom:20px;">
+            <button class="btn" style="width:auto;" onclick="prepHost(2)">2</button>
+            <button class="btn" style="width:auto;" onclick="prepHost(3)">3</button>
+            <button class="btn" style="width:auto;" onclick="prepHost(4)">4</button>
+        </div>
+        <button class="btn" onclick="showScreen('custom-online-screen')" style="background:#333; color:white;">Cancel</button>
+    </div>
+
+    <!-- 7. LOBBY -->
+    <div id="lobby-screen" class="screen">
+        <h2>Waiting Room</h2>
+        <h1 id="lobby-code" style="color:#f1c40f; font-size:3rem; letter-spacing:5px;">...</h1>
+        <p>Share this code</p>
+        <ul id="lobby-list"></ul>
+        <div id="lobby-msg" class="loading">Waiting for players...</div>
+        <button id="start-online-btn" class="btn btn-green" style="display:none;" onclick="startOnlineGame()">Start Game</button>
+        <button class="btn" onclick="exitGame()" style="background:#333; color:white; margin-top:20px;">Cancel</button>
+    </div>
+
+    <!-- 8. JOIN -->
+    <div id="join-screen" class="screen">
+        <h2>Join Game</h2>
+        <input type="text" id="room-code-input" placeholder="Enter Room Code">
+        <button class="btn btn-green" onclick="joinGame()">Join</button>
+        <p id="join-status" class="loading" style="display:none;">Connecting...</p>
+        <button class="btn" onclick="showScreen('custom-online-screen')" style="background:#333; color:white;">Cancel</button>
+    </div>
+
+    <!-- 9. GAME UI -->
+    <div id="game-ui">
+        <div id="room-code-display">Code: <span id="display-code"></span></div>
+        <div id="game-layout">
+            <div class="player-bar top">
+                <div id="hub-red" class="player-hub"><div class="scene" onclick="rollDice('red')"><div class="cube" id="cube-red"><div class="cube__face cube__face--1"></div><div class="cube__face cube__face--2"></div><div class="cube__face cube__face--3"></div><div class="cube__face cube__face--4"></div><div class="cube__face cube__face--5"></div><div class="cube__face cube__face--6"></div></div></div><div class="p-info"></div></div>
+                <div id="hub-green" class="player-hub"><div class="scene" onclick="rollDice('green')"><div class="cube" id="cube-green"><div class="cube__face cube__face--1"></div><div class="cube__face cube__face--2"></div><div class="cube__face cube__face--3"></div><div class="cube__face cube__face--4"></div><div class="cube__face cube__face--5"></div><div class="cube__face cube__face--6"></div></div></div><div class="p-info"></div></div>
+            </div>
+            
+            <div id="board-container"><div id="svg-holder"></div></div>
+            
+            <div class="player-bar bottom">
+                <div id="hub-blue" class="player-hub"><div class="p-info"></div><div class="scene" onclick="rollDice('blue')"><div class="cube" id="cube-blue"><div class="cube__face cube__face--1"></div><div class="cube__face cube__face--2"></div><div class="cube__face cube__face--3"></div><div class="cube__face cube__face--4"></div><div class="cube__face cube__face--5"></div><div class="cube__face cube__face--6"></div></div></div></div>
+                <div id="hub-yellow" class="player-hub"><div class="p-info"></div><div class="scene" onclick="rollDice('yellow')"><div class="cube" id="cube-yellow"><div class="cube__face cube__face--1"></div><div class="cube__face cube__face--2"></div><div class="cube__face cube__face--3"></div><div class="cube__face cube__face--4"></div><div class="cube__face cube__face--5"></div><div class="cube__face cube__face--6"></div></div></div></div>
+            </div>
+        </div>
+        
+        <div id="mic-btn" class="control-btn" onclick="toggleMic()">🎙️</div>
+        <div id="chat-btn" class="control-btn" onclick="toggleChat()">💬</div>
+        
+        <div id="chat-ui">
+            <div id="chat-msgs"></div>
+            <input type="text" id="chat-input" placeholder="Type here..." onkeypress="sendChat(event)">
+            <div id="emoji-bar">
+                <span onclick="sendEmoji('👍')">👍</span>
+                <span onclick="sendEmoji('😂')">😂</span>
+                <span onclick="sendEmoji('😡')">😡</span>
+                <span onclick="sendEmoji('😎')">😎</span>
+                <span onclick="sendEmoji('😭')">😭</span>
+            </div>
+        </div>
+        <button onclick="exitGame()" style="position: absolute; top:10px; right:10px; z-index:200; background:rgba(0,0,0,0.6); color:white; border:none; padding:8px 12px; border-radius:8px;">EXIT</button>
+    </div>
+
+    <div id="toast"></div>
+
+    <audio id="s-dice" src="https://www.soundjay.com/buttons/sounds/button-16.mp3"></audio>
+    <audio id="s-step" src="https://www.soundjay.com/buttons/sounds/button-37.mp3"></audio> 
+    <audio id="s-kill" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+    <audio id="s-win" src="https://www.soundjay.com/human/sounds/applause-01.mp3"></audio>
+    <audio id="s-msg" src="https://www.soundjay.com/buttons/sounds/button-30.mp3"></audio>
+
+<script>
+    const sounds = { dice: document.getElementById('s-dice'), step: document.getElementById('s-step'), kill: document.getElementById('s-kill'), win: document.getElementById('s-win'), msg: document.getElementById('s-msg') };
+    let gameMode = '', playerCount = 0, myColor = 'red', players = [], currentPlayerIdx = 0, diceVal = 1, turnState = 'ROLL', consecutiveSixes = {}, positions = {}, winners = [];
+    let isOnline = false, peer = null, conn = [], myPeerId = null, localStream = null;
+    let playerName = "Guest";
+    let tempHostCount = 0;
+    let nameMap = {}; // Maps color to name
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+        document.getElementById(id).classList.add('active-screen');
+    }
+
+    function saveProfile() {
+        playerName = document.getElementById('p-name').value || "Guest";
+        showToast("Profile Saved!");
+        showScreen('menu-screen');
+    }
+
+    function exitGame() {
+        if(peer) { peer.destroy(); peer = null; }
+        if(localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+        location.reload();
+    }
+
+    function prepOffline(cnt, mode) {
+        playerCount = cnt; gameMode = mode; isOnline = false;
+        showScreen('color-select-screen');
+    }
+
+    function prepHost(cnt) {
+        tempHostCount = cnt; gameMode = 'online';
+        showScreen('color-select-screen');
+    }
+
+    function selectMyColor(c) {
+        myColor = c;
+        if(isOnline || gameMode === 'online') {
+            startHostingLogic();
+        } else {
+            let all = ['red', 'green', 'yellow', 'blue'];
+            if(playerCount === 2) {
+                players = [c, all[(all.indexOf(c)+2)%4]];
+                const order = ['red','green','yellow','blue'];
+                players.sort((a,b) => order.indexOf(a) - order.indexOf(b));
+            } else {
+                players = all.slice(0, playerCount);
+                if(!players.includes(c)) { players[playerCount-1] = c; players.sort((a,b) => all.indexOf(a) - all.indexOf(b)); }
+            }
+            startGame();
+        }
+    }
+
+    // --- PEERJS ---
+    function initPeer(callback) {
+        let id = Math.floor(Math.random() * 9000) + 1000; 
+        peer = new Peer('ludo-pro-v2-' + id);
+        
+        peer.on('open', (id) => {
+            myPeerId = id;
+            if(callback) callback(id.split('-')[3]); 
+        });
+
+        peer.on('connection', (c) => {
+            conn.push(c);
+            setupConnection(c);
+        });
+
+        peer.on('call', (call) => {
+            call.answer(localStream);
+            call.on('stream', (remoteStream) => { playRemoteAudio(remoteStream); });
+        });
+        peer.on('error', (err) => showToast("Connection Error"));
+    }
+
+    function startHostingLogic() {
+        showScreen('lobby-screen');
+        playerCount = tempHostCount;
+        nameMap[myColor] = playerName;
+        
+        initPeer((code) => {
+            document.getElementById('lobby-code').innerText = code;
+            isOnline = true;
+            updateLobbyUI();
+        });
+    }
+
+    function updateLobbyUI() {
+        let list = document.getElementById('lobby-list');
+        list.innerHTML = `<li>👑 ${playerName} (${myColor.toUpperCase()})</li>`;
+        conn.forEach(c => {
+             if(c.metadata) list.innerHTML += `<li>👤 ${c.metadata.name}</li>`;
+        });
+        let need = playerCount - 1;
+        let curr = conn.length;
+        document.getElementById('lobby-msg').innerText = `Waiting for ${need - curr} players...`;
+        
+        if(curr === need) {
+            document.getElementById('start-online-btn').style.display = 'inline-block';
+            document.getElementById('lobby-msg').style.display = 'none';
+        }
+    }
+
+    function startOnlineGame() {
+        let all = ['red', 'green', 'yellow', 'blue'];
+        let available = all.filter(c => c !== myColor);
+        
+        let pList = [myColor];
+        let pNames = {}; pNames[myColor] = playerName;
+
+        conn.forEach((c, i) => {
+            let assigned = available[i];
+            pList.push(assigned);
+            pNames[assigned] = c.metadata ? c.metadata.name : "Player";
+            c.send({ type: 'START_GAME', color: assigned, count: playerCount });
+        });
+        
+        const order = ['red','green','yellow','blue'];
+        pList.sort((a,b) => order.indexOf(a) - order.indexOf(b));
+        players = pList;
+        nameMap = pNames;
+
+        sendData({ type: 'SYNC_DATA', pList: players, names: nameMap });
+        startGame();
+    }
+
+    function joinGame() {
+        let code = document.getElementById('room-code-input').value;
+        if(!code) return showToast("Enter Code");
+        
+        document.getElementById('join-status').style.display = 'block';
+        initPeer(() => {
+            let connHost = peer.connect('ludo-pro-v2-' + code, { metadata: { name: playerName } });
+            connHost.on('open', () => {
+                conn.push(connHost);
+                setupConnection(connHost);
+                connHost.send({ type: 'JOIN_REQ', name: playerName });
+                document.getElementById('join-status').innerText = "In Lobby... Waiting for Host";
+            });
+        });
+    }
+
+    function setupConnection(c) {
+        c.on('data', (data) => {
+            if(data.type === 'JOIN_REQ') {
+                c.metadata = { name: data.name };
+                updateLobbyUI();
+                showToast(data.name + " Joined!");
+            }
+            else if (data.type === 'START_GAME') {
+                myColor = data.color;
+                playerCount = data.count;
+                isOnline = true;
+            }
+            else if (data.type === 'SYNC_DATA') {
+                players = data.pList;
+                nameMap = data.names;
+                startGame();
+                showToast("Game Started! You are " + myColor.toUpperCase());
+            }
+            else if (data.type === 'ROLL') {
+                if(data.color !== myColor) performRemoteRoll(data.color, data.val);
+            }
+            else if (data.type === 'MOVE') {
+                runToken(data.color, data.idx, true);
+            }
+            else if (data.type === 'CHAT') {
+                addChat(data.sender, data.msg);
+            }
+        });
+    }
+
+    function sendData(data) { conn.forEach(c => c.send(data)); }
+
+    function startGame() {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+        document.getElementById('game-ui').style.display = 'block';
+        if(isOnline) {
+            document.getElementById('chat-btn').style.display = 'flex';
+            document.getElementById('mic-btn').style.display = 'flex';
+            document.getElementById('room-code-display').style.display = 'block';
+            if(myPeerId) document.getElementById('display-code').innerText = myPeerId.split('-')[3];
+        }
+
+        ['red','green','yellow','blue'].forEach(c => {
+            let hub = document.getElementById(`hub-${c}`);
+            let isActive = players.includes(c);
+            hub.style.visibility = isActive ? 'visible' : 'hidden';
+            positions[c] = [-1,-1,-1,-1]; consecutiveSixes[c] = 0;
+            
+            // Set Names
+            let nameDisplay = "";
+            if(isActive) {
+                if(isOnline) nameDisplay = nameMap[c] || "Player";
+                else {
+                    if(c === myColor) nameDisplay = playerName;
+                    else nameDisplay = (gameMode === 'vsAI') ? "Computer" : "Player " + (players.indexOf(c)+1);
+                }
+            }
+            hub.querySelector('.p-info').innerText = nameDisplay;
+        });
+
+        createBoard(); drawTokens();
+        currentPlayerIdx = 0;
+        updateTurnUI();
+        checkAI();
+    }
+
+    function checkAI() {
+        let c = players[currentPlayerIdx];
+        if(!isOnline && gameMode === 'vsAI' && c !== myColor) setTimeout(() => rollDice(c), 1000);
+    }
+
+    const UNIT = 100/15;
+    const path = [{x:1,y:6},{x:2,y:6},{x:3,y:6},{x:4,y:6},{x:5,y:6}, {x:6,y:5},{x:6,y:4},{x:6,y:3},{x:6,y:2},{x:6,y:1}, {x:6,y:0},{x:7,y:0},{x:8,y:0},{x:8,y:1},{x:8,y:2},{x:8,y:3},{x:8,y:4},{x:8,y:5}, {x:9,y:6},{x:10,y:6},{x:11,y:6},{x:12,y:6},{x:13,y:6}, {x:14,y:6},{x:14,y:7},{x:14,y:8},{x:13,y:8},{x:12,y:8},{x:11,y:8},{x:10,y:8},{x:9,y:8}, {x:8,y:9},{x:8,y:10},{x:8,y:11},{x:8,y:12},{x:8,y:13}, {x:8,y:14},{x:7,y:14},{x:6,y:14},{x:6,y:13},{x:6,y:12},{x:6,y:11},{x:6,y:10},{x:6,y:9}, {x:5,y:8},{x:4,y:8},{x:3,y:8},{x:2,y:8},{x:1,y:8}, {x:0,y:8},{x:0,y:7},{x:0,y:6}];
+    const startIdx = { red: 0, green: 13, yellow: 26, blue: 39 };
+    const homes = { red: [{x:1,y:7},{x:2,y:7},{x:3,y:7},{x:4,y:7},{x:5,y:7},{x:6,y:7}], green: [{x:7,y:1},{x:7,y:2},{x:7,y:3},{x:7,y:4},{x:7,y:5},{x:7,y:6}], yellow: [{x:13,y:7},{x:12,y:7},{x:11,y:7},{x:10,y:7},{x:9,y:7},{x:8,y:7}], blue: [{x:7,y:13},{x:7,y:12},{x:7,y:11},{x:7,y:10},{x:7,y:9},{x:7,y:8}] };
+    const bases = { red: [{x:1.5,y:1.5},{x:3.5,y:1.5},{x:1.5,y:3.5},{x:3.5,y:3.5}], green: [{x:10.5,y:1.5},{x:12.5,y:1.5},{x:10.5,y:3.5},{x:12.5,y:3.5}], yellow: [{x:10.5,y:10.5},{x:12.5,y:10.5},{x:10.5,y:12.5},{x:12.5,y:12.5}], blue: [{x:1.5,y:10.5},{x:3.5,y:10.5},{x:1.5,y:12.5},{x:3.5,y:12.5}] };
+
+    function createBoard() {
+        let svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("id", "ludo-board-svg"); svg.setAttribute("viewBox", "0 0 100 100");
+        let defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        ['red','green','yellow','blue'].forEach(c => { let g = document.createElementNS("http://www.w3.org/2000/svg", "radialGradient"); g.id = `grad-${c}`; g.innerHTML = `<stop offset="30%" stop-color="var(--${c})"/><stop offset="100%" stop-color="var(--${c}-dark)"/>`; defs.appendChild(g); });
+        svg.appendChild(defs);
+        let html = `<rect width="100" height="100" fill="white" stroke="#333" stroke-width="0.5"/>`;
+        const drawBase = (x,y,c) => `<rect x="${x}" y="${y}" width="40" height="40" fill="var(--${c})"/><rect x="${x+6}" y="${y+6}" width="28" height="28" fill="white" rx="2"/>`;
+        html += drawBase(0,0,'red'); html += drawBase(60,0,'green'); html += drawBase(0,60,'blue'); html += drawBase(60,60,'yellow');
+        const cell = (x,y,fill, stroke='#888') => `<rect x="${x*UNIT}" y="${y*UNIT}" width="${UNIT}" height="${UNIT}" fill="${fill}" stroke="${stroke}" stroke-width="0.2"/>`;
+        path.forEach((p,i) => { let isSafe = [0,8,13,21,26,34,39,47].includes(i); html += cell(p.x, p.y, isSafe ? '#ddd' : 'white'); if(isSafe && i%13!=0) html += `<text x="${(p.x+0.5)*UNIT}" y="${(p.y+0.75)*UNIT}" font-size="4" text-anchor="middle" fill="#666">★</text>`; });
+        html += cell(1,6,'var(--red)'); html += cell(8,1,'var(--green)'); html += cell(6,13,'var(--blue)'); html += cell(13,8,'var(--yellow)');
+        homes.red.forEach(p=>html+=cell(p.x,p.y,'var(--red)')); homes.green.forEach(p=>html+=cell(p.x,p.y,'var(--green)')); homes.blue.forEach(p=>html+=cell(p.x,p.y,'var(--blue)')); homes.yellow.forEach(p=>html+=cell(p.x,p.y,'var(--yellow)'));
+        html += `<polygon points="40,40 50,50 40,60" fill="var(--red)"/><polygon points="40,40 50,50 60,40" fill="var(--green)"/><polygon points="60,60 50,50 40,60" fill="var(--blue)"/><polygon points="60,60 50,50 60,40" fill="var(--yellow)"/>`;
+        svg.innerHTML += html; document.getElementById('svg-holder').innerHTML = ''; document.getElementById('svg-holder').appendChild(svg);
+    }
+
+    function updateTurnUI() {
+        document.querySelectorAll('.player-hub').forEach(h => h.classList.remove('active-turn'));
+        let c = players[currentPlayerIdx];
+        if(!winners.includes(c)) document.getElementById(`hub-${c}`).classList.add('active-turn');
+    }
+
+    async function rollDice(color) {
+        if(turnState !== 'ROLL') return;
+        let isAI = (!isOnline && gameMode === 'vsAI' && color !== myColor);
+        if(color !== players[currentPlayerIdx]) return;
+        if(isOnline && color !== myColor) return;
+        if(!isAI && players[currentPlayerIdx] !== myColor && gameMode === 'vsAI') return;
+
+        turnState = 'ANIM';
+        let val = Math.floor(Math.random() * 6) + 1;
+        if(isOnline) sendData({ type: 'ROLL', color: color, val: val });
+        await performRemoteRoll(color, val);
+    }
+
+    async function performRemoteRoll(color, val) {
+        diceVal = val;
+        sounds.dice.currentTime = 0; sounds.dice.play();
+        let cube = document.getElementById(`cube-${color}`);
+        
+        cube.classList.remove('rolling'); cube.style.transition = 'none'; cube.style.transform = `translateZ(-27px) rotateX(0deg) rotateY(0deg)`; void cube.offsetWidth;
+        cube.classList.add('rolling');
+        await new Promise(r => setTimeout(r, 500));
+        cube.classList.remove('rolling');
+
+        let rx=0, ry=0;
+        if(val===1) { rx=0; ry=0; } else if(val===2) { rx=0; ry=-90; } else if(val===3) { rx=0; ry=-180; }
+        else if(val===4) { rx=0; ry=90; } else if(val===5) { rx=-90; ry=0; } else if(val===6) { rx=90; ry=0; }
+
+        cube.style.transition = "transform 0.6s ease-out";
+        cube.style.transform = `translateZ(-27px) rotateX(${rx+720}deg) rotateY(${ry+720}deg)`;
+        
+        await new Promise(r => setTimeout(r, 600));
+        processDice(color);
+    }
+
+    function processDice(c) {
+        if(diceVal===6) consecutiveSixes[c]++; else consecutiveSixes[c]=0;
+        if(consecutiveSixes[c]===3) { consecutiveSixes[c]=0; showToast("Oops! Three 6s"); nextTurn(); return; }
+        
+        let moves = getMoves(c);
+        let isAI = (!isOnline && gameMode==='vsAI' && c!==myColor);
+
+        if(moves.length === 0) {
+            setTimeout(nextTurn, 500);
+        } else if (moves.length === 1 || isAI) {
+            if(isOnline && c !== myColor) return;
+            if(isAI) setTimeout(() => runToken(c, moves[0]), 500);
+            else {
+                if(moves.length === 1) { turnState = 'MOVE'; highlight(c, [moves[0]]); } // Manual for human
+                else { turnState = 'MOVE'; highlight(c, moves); }
+            }
+        } else {
+            if(isOnline && c !== myColor) return;
+            turnState = 'MOVE'; highlight(c, moves);
+        }
+    }
+
+    function getMoves(c) {
+        return positions[c].map((p,i) => {
+            if(winners.includes(c)) return null;
+            if(p === -1) return diceVal===6 ? i : null;
+            if(p+diceVal <= 57) return i;
+            return null;
+        }).filter(x => x!==null);
+    }
+
+    function highlight(c, idxs) {
+        let svg = document.getElementById('ludo-board-svg');
+        idxs.forEach(i => {
+            let t = svg.querySelector(`.token[data-c="${c}"][data-i="${i}"]`);
+            if(t) t.classList.add('token-highlight');
+        });
+    }
+
+    // --- FIXED MOVEMENT LOGIC ---
+    async function runToken(c, i, isRemote=false) {
+        if(isOnline && !isRemote && c !== myColor) return; 
+        if(isOnline && !isRemote) sendData({ type: 'MOVE', color: c, idx: i });
+
+        document.querySelectorAll('.token-highlight').forEach(el=>el.classList.remove('token-highlight'));
+        turnState = 'ANIM';
+        
+        let curr = positions[c][i];
+        
+        // Start from base
+        if(curr === -1) {
+            positions[c][i] = 0; 
+            sounds.step.play(); 
+            drawTokens(); 
+            await new Promise(r=>setTimeout(r,300));
+        } else {
+            // Move step by step exactly diceVal times
+            for(let s=1; s<=diceVal; s++) {
+                if(positions[c][i] < 57) {
+                    positions[c][i]++; 
+                    sounds.step.currentTime=0; 
+                    sounds.step.play(); 
+                    drawTokens(); 
+                    await new Promise(r=>setTimeout(r, 250)); // Slower animation to prevent "skip" illusion
+                }
+            }
+        }
+        
+        if(positions[c][i] === 57) positions[c][i] = 100;
+
+        // Kill Logic
+        let killed = false;
+        let finalPos = positions[c][i];
+        if(finalPos !== 100 && finalPos <= 51) {
+            let abs = (startIdx[c] + finalPos) % 52;
+            if(![0,8,13,21,26,34,39,47].includes(abs)) {
+                players.forEach(opp => {
+                    if(opp !== c) {
+                        positions[opp].forEach((p, idx) => {
+                            if(p !== -1 && p <= 51 && (startIdx[opp]+p)%52 === abs) {
+                                positions[opp][idx] = -1; killed = true;
+                                sounds.kill.play(); showToast("KILLED!");
+                            }
+                        });
+                    }
+                });
+            }
+        }
+        drawTokens();
+        
+        if(positions[c].every(p=>p===100)) { winners.push(c); sounds.win.play(); showToast(c + " Wins!"); }
+        
+        if(diceVal === 6 || killed) {
+            turnState = 'ROLL';
+            checkAI();
+        } else nextTurn();
+    }
+
+    function nextTurn() {
+        let cnt=0;
+        do { currentPlayerIdx = (currentPlayerIdx+1)%players.length; cnt++; } while(winners.includes(players[currentPlayerIdx]) && cnt<4);
+        turnState = 'ROLL'; updateTurnUI();
+        checkAI();
+    }
+
+    function drawTokens() {
+        let svg = document.getElementById('ludo-board-svg');
+        svg.querySelectorAll('.token').forEach(t=>t.remove());
+        let map = {};
+        players.forEach(c => {
+            positions[c].forEach((p, i) => {
+                let coord;
+                if(p===-1) coord = bases[c][i];
+                else if(p===100) coord = homes[c][5];
+                else if(p>51) coord = homes[c][p-52];
+                else coord = path[(startIdx[c]+p)%52];
+                let key = `${Math.round(coord.x)}_${Math.round(coord.y)}`;
+                if(!map[key]) map[key] = []; map[key].push({c, i, x: coord.x, y: coord.y});
+            });
+        });
+        Object.values(map).forEach(group => {
+            group.forEach((item, idx) => {
+                let offset = group.length > 1 ? (idx/group.length)*6.28 : 0;
+                let ox = group.length > 1 ? Math.cos(offset)*1.5 : 0;
+                let oy = group.length > 1 ? Math.sin(offset)*1.5 : 0;
+                let c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                c.setAttribute("class", "token");
+                c.setAttribute("cx", (item.x+0.5)*UNIT + ox); c.setAttribute("cy", (item.y+0.5)*UNIT + oy);
+                c.setAttribute("fill", `url(#grad-${item.c})`); c.setAttribute("data-c", item.c); c.setAttribute("data-i", item.i);
+                c.addEventListener('click', (e) => { e.stopPropagation(); 
+                    if(turnState==='MOVE' && c.classList.contains('token-highlight')) runToken(item.c, item.i); 
+                });
+                svg.appendChild(c);
+            });
+        });
+    }
+
+    function toggleChat() {
+        let ui = document.getElementById('chat-ui');
+        ui.style.display = ui.style.display === 'block' ? 'none' : 'block';
+    }
+    
+    function toggleMic() {
+        if(confirm("Enable/Disable Microphone?")) {
+            let btn = document.getElementById('mic-btn');
+            if(localStream) {
+                let track = localStream.getAudioTracks()[0];
+                track.enabled = !track.enabled;
+                if(track.enabled) btn.classList.add('mic-on'); else btn.classList.remove('mic-on');
+            } else {
+                navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
+                    localStream = stream;
+                    btn.classList.add('mic-on');
+                    conn.forEach(c => { peer.call(c.peer, stream); });
+                }).catch(err => showToast("Mic Access Denied"));
+            }
+        }
+    }
+    function playRemoteAudio(stream) { let audio = document.createElement('audio'); audio.srcObject = stream; audio.play(); }
+
+    function sendChat(e) {
+        if(e.key === 'Enter') {
+            let val = document.getElementById('chat-input').value;
+            if(val) { addChat(playerName, val); sendData({ type: 'CHAT', sender: playerName, msg: val }); document.getElementById('chat-input').value = ''; }
+        }
+    }
+    function sendEmoji(e) { addChat(playerName, e); sendData({ type: 'CHAT', sender: playerName, msg: e }); }
+    function addChat(user, text) {
+        let d = document.getElementById('chat-msgs');
+        d.innerHTML += `<div><b>${user}:</b> ${text}</div>`; d.scrollTop = d.scrollHeight;
+        if(document.getElementById('chat-ui').style.display === 'none') showToast("New Message");
+        sounds.msg.play();
+    }
+    function showToast(m) { let t = document.getElementById('toast'); t.innerText = m; t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 2000); }
+</script>
+</body>
+</html>
